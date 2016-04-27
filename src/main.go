@@ -9,27 +9,31 @@ import (
 	"gopkg.in/redis.v3"
 	"log"
 	"sync"
-	"time"
+	//"time"
+	"os/exec"
+	"strings"
+	"bytes"
 )
 
 var (
 	shard = flag.String("shard", "queue", "Name of the shard")
-	redisHost = flag.String("host", "localhost", "Host for Redis")
-	redisPort = flag.String("port", "3333", "Port for Redis")
-	redisClient = redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
-		Password: "",
-		DB: 0,
-	})
+	redisHost = flag.String("host", "localhost:6379", "Host for Redis")
+	redisClient *redis.Client
 	waitGroup = sync.WaitGroup{}
 )
 
 func RunJob(job string) {
 	defer waitGroup.Done()
 
-	time.Sleep(time.Second*10) // simulate work
-	log.Printf("%s\n", job)
-
+	cmd := exec.Command(flag.Arg(0))
+	cmd.Stdin = strings.NewReader(job)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("job returned: %q\n", out.String())
 }
 
 func HandleMessages(done chan bool, pubsub *redis.PubSub) {
@@ -57,6 +61,17 @@ func main() {
 	log.Println("Queue Worker")
 	log.Println("Written by Daniel Fekete <daniel.fekete@voov.hu>")
 	flag.Parse()
+
+	if flag.NArg() != 1 {
+		log.Fatalln("Invalid number of arguments")
+	}
+
+	redisClient = redis.NewClient(&redis.Options{
+		Addr: redisHost,
+		Password: "",
+		DB: 0,
+	})
+
 	log.Printf("Running shard %s\n", *shard)
 
 	_, err := redisClient.Ping().Result()
@@ -67,13 +82,16 @@ func main() {
 	signalCh := make(chan os.Signal)
 	signal.Notify(signalCh, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
 
-	pubsub, err := redisClient.Subscribe("billingo-1")
+	// subscribe to redis channel
+	pubsub, err := redisClient.Subscribe(*shard)
 	if err != nil {
 		log.Fatalf("Error when subscribing to shard %s: %v\n", shard,err)
 	}
-	done := make(chan bool)
+
+	done := make(chan bool) // channel to
 	go HandleMessages(done, pubsub)
-	<-signalCh
+
+	<-signalCh // wait for the system signal
 	close(done)
 
 	// wait until every operation is finished
