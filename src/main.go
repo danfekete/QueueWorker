@@ -20,7 +20,7 @@ import (
 var (
 	shard = flag.String("shard", "queue", "Name of the shard")
 	redisHost = flag.String("host", "localhost:6379", "Host for Redis")
-	// workers = flag.Int("workers", 100, "Number of workers to use") // TODO: implement
+	workers = flag.Int("workers", 10, "Number of workers to use") // TODO: implement
 	redisClient *redis.Client
 	waitGroup = sync.WaitGroup{}
 	jobQueue = lang.NewQueue() // FIFO list of jobs
@@ -44,7 +44,7 @@ func RunJob(job string) {
 }
 
 
-func Worker(done chan bool) {
+func Worker(id int, done chan bool) {
 	for {
 		select {
 		case <-done:
@@ -57,7 +57,7 @@ func Worker(done chan bool) {
 		if jobString != nil {
 			// there is a job to process
 			time.Sleep(time.Second*5)
-			log.Println("Job: ", jobString)
+			log.Printf("Worked %d finished job %s\n", id, jobString)
 			waitGroup.Done()
 		}
 
@@ -125,7 +125,11 @@ func main() {
 
 	done := make(chan bool) // channel to
 	go HandleMessages(done, pubsub)
-	go Worker(done) // start 1 worker
+
+	for i:=1; i<=*workers; i++ {
+		go Worker(i, done) // start 1 worker
+	}
+
 
 	<-signalCh // wait for the system signal
 	close(done)
