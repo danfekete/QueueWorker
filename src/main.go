@@ -9,7 +9,7 @@ import (
 	"gopkg.in/redis.v3"
 	"log"
 	"sync"
-	"time"
+	//"time"
 	"os/exec"
 	"strings"
 	"bytes"
@@ -20,7 +20,7 @@ var (
 	shard = flag.String("shard", "queue", "Name of the shard")
 	publishTo = flag.String("pub", "ws", "Name of the channel to publish the command output to")
 	redisHost = flag.String("host", "localhost:6379", "Host for Redis")
-	workers = flag.Int("workers", 10, "Number of workers to use") // TODO: implement
+	workers = flag.Int("workers", 10, "Number of workers to use")
 	redisClient *redis.Client
 	waitGroup = sync.WaitGroup{}
 	jobQueue = lang.NewQueue() // FIFO list of jobs
@@ -35,7 +35,7 @@ func RunCommand(job string) string {
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err := cmd.Run()
-	time.Sleep(time.Second)
+	//time.Sleep(time.Second)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func Worker(id int, done chan bool) {
 			jobReturned := RunCommand(jobString.(string))
 			// publish output to channel
 			redisClient.Publish(*publishTo, jobReturned)
-			log.Printf("Worker %d finished job %s\n", id, jobReturned)
+			//log.Printf("Worker %d finished job %s\n", id, jobReturned)
 			waitGroup.Done()
 		}
 
