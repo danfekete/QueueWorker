@@ -14,6 +14,7 @@ import (
 	"strings"
 	"bytes"
 	"github.com/hishboy/gocommons/lang"
+	"time"
 )
 
 var (
@@ -35,7 +36,7 @@ func RunCommand(job string) string {
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err := cmd.Run()
-	//time.Sleep(time.Second)
+	time.Sleep(time.Second)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -46,13 +47,13 @@ func RunCommand(job string) string {
 /**
 	Job worker
  */
-func Worker(id int, done chan bool) {
+func Worker(id int) {
 	for {
-		select {
-		case <-done:
-			return;
-		default:
-		}
+		//select {
+		//case <-done:
+		//	return;
+		//default:
+		//}
 
 		jobString := jobQueue.Poll() // get job from the queue
 
@@ -132,7 +133,7 @@ func main() {
 	go HandleMessages(done, pubsub)
 
 	for i:=1; i<=*workers; i++ {
-		go Worker(i, done) // start a worker
+		go Worker(i) // start a worker
 	}
 
 
