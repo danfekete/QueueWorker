@@ -9,16 +9,16 @@ import (
 	"gopkg.in/redis.v3"
 	"log"
 	"sync"
-	//"time"
+	"time"
 	"os/exec"
 	"strings"
 	"bytes"
 	"github.com/hishboy/gocommons/lang"
-	"time"
 )
 
 var (
 	shard = flag.String("shard", "queue", "Name of the shard")
+	publishTo = flag.String("pub", "ws", "Name of the channel to publish the command output to")
 	redisHost = flag.String("host", "localhost:6379", "Host for Redis")
 	workers = flag.Int("workers", 10, "Number of workers to use") // TODO: implement
 	redisClient *redis.Client
@@ -29,21 +29,23 @@ var (
 /**
 	Run a job
  */
-func RunJob(job string) {
-	defer waitGroup.Done()
-
+func RunCommand(job string) string {
 	cmd := exec.Command(flag.Arg(0))
 	cmd.Stdin = strings.NewReader(job)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err := cmd.Run()
+	time.Sleep(time.Second)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("job returned: %q\n", out.String())
+	return out.String()
 }
 
 
+/**
+	Job worker
+ */
 func Worker(id int, done chan bool) {
 	for {
 		select {
@@ -56,8 +58,11 @@ func Worker(id int, done chan bool) {
 
 		if jobString != nil {
 			// there is a job to process
-			time.Sleep(time.Second*5)
-			log.Printf("Worked %d finished job %s\n", id, jobString)
+			//time.Sleep(time.Second*2)
+			jobReturned := RunCommand(jobString.(string))
+			// publish output to channel
+			redisClient.Publish(*publishTo, jobReturned)
+			log.Printf("Worker %d finished job %s\n", id, jobReturned)
 			waitGroup.Done()
 		}
 
@@ -127,7 +132,7 @@ func main() {
 	go HandleMessages(done, pubsub)
 
 	for i:=1; i<=*workers; i++ {
-		go Worker(i, done) // start 1 worker
+		go Worker(i, done) // start a worker
 	}
 
 
