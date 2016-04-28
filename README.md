@@ -4,7 +4,7 @@ Subscribes to `shard` channel on Redis and pushes every incoming jobs to a Queue
 
 When job is finished it publishes the command's stdout to `pub` channel on Redis
 
- ### Usage
+### Usage
 
  ```
 qworker [options] "command"
